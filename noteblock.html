@@ -1,0 +1,751 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Noteblock</title>
+<style>
+  :root{
+    --ink:#100D0B; --ink2:#17120E; --panel:#1D1712; --panel2:#241D16; --line:#332920;
+    --accent:#C79A4B; --accent-dim:#8C6B32; --accent-ink:#1A1209;
+    --text:#EFE6D7; --muted:#9C8B74; --field:#120E0B; --warn:#B9573B;
+    --glow:rgba(36,28,21,.9); --grain:rgba(255,255,255,.014); --shadow:rgba(0,0,0,.55);
+    --r:10px;
+    --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  :root[data-theme="light"]{
+    --ink:#F5F2EC; --ink2:#EFEBE3; --panel:#FFFFFF; --panel2:#F6F2EA; --line:#E0D8CA;
+    --accent:#8A6A2F; --accent-dim:#B99B63; --accent-ink:#FFFFFF;
+    --text:#22201C; --muted:#7A7267; --field:#FFFFFF; --warn:#A2452C;
+    --glow:rgba(255,255,255,.9); --grain:rgba(0,0,0,.012); --shadow:rgba(60,50,35,.16);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, var(--glow) 0%, rgba(0,0,0,0) 60%),
+      repeating-linear-gradient(92deg, var(--grain) 0 2px, rgba(0,0,0,0) 2px 7px),
+      var(--ink);
+    color:var(--text); font-family:var(--body); font-size:16px; line-height:1.5;
+    -webkit-text-size-adjust:100%; padding-bottom:env(safe-area-inset-bottom);
+    transition:background-color .2s,color .2s;
+  }
+  button,input,textarea,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  .wrap{max-width:920px;margin:0 auto;padding:0 16px}
+  .hidden{display:none !important}
+
+  .themebtn{
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    width:38px;height:38px;display:grid;place-items:center;color:var(--muted);flex:none;
+  }
+  .themebtn:hover{color:var(--text);border-color:var(--accent-dim)}
+  #themeFixed{position:fixed;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:30}
+
+  /* ---------- lock screen ---------- */
+  #gate{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:28px 16px}
+  .plate{
+    width:100%;max-width:420px;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:30px 24px 26px;
+    box-shadow:0 24px 60px var(--shadow);text-align:center;
+  }
+  .mark{width:56px;height:56px;margin:0 auto 16px;display:block}
+  .mark .lid{transform-origin:32px 30px;transition:transform .45s cubic-bezier(.5,1.5,.4,1)}
+  .plate.open .mark .lid{transform:translateY(-6px) rotate(-8deg)}
+  h1{font-family:var(--display);font-weight:600;font-size:28px;letter-spacing:.05em;margin:0 0 6px}
+  .tagline{color:var(--muted);font-size:13.5px;margin:0 0 22px}
+  .rule{height:1px;background:var(--line);margin:20px 0}
+  label.fl{display:block;text-align:left;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  input[type=password],input[type=text],textarea,select{
+    width:100%;background:var(--field);border:1px solid var(--line);border-radius:var(--r);
+    padding:12px 13px;color:var(--text);outline:none;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--accent-dim);box-shadow:0 0 0 3px rgba(160,125,60,.18)}
+  .field{margin-bottom:14px;text-align:left}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    padding:11px 15px;border-radius:var(--r);min-height:44px;transition:background .15s,border-color .15s;
+  }
+  .btn:hover{border-color:var(--accent-dim)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:650}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.wide{width:100%}
+  .btn.sm{padding:7px 11px;min-height:36px;font-size:14px}
+  .btn.danger:hover{border-color:var(--warn);color:var(--warn)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .linkrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:16px}
+  .link{background:none;border:0;color:var(--accent);padding:8px 6px;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+  .msg{font-size:14px;margin:12px 0 0;min-height:20px}
+  .msg.err{color:var(--warn)}
+  .msg.ok{color:var(--accent)}
+  .meter{height:4px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-top:8px}
+  .meter i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+  .note-sm{font-size:12.5px;color:var(--muted);text-align:left;margin:10px 0 0;line-height:1.45}
+
+  /* ---------- app ---------- */
+  header.bar{position:sticky;top:0;z-index:20;background:var(--ink);border-bottom:1px solid var(--line)}
+  .barin{display:flex;align-items:center;gap:8px;padding:11px 0}
+  .brand{font-family:var(--display);font-size:17px;letter-spacing:.03em;white-space:nowrap}
+  .spacer{flex:1}
+  .stat{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .tabs{display:flex;gap:4px;padding:0 0 10px}
+  .tab{flex:1;background:transparent;border:1px solid var(--line);border-radius:var(--r);padding:9px;color:var(--muted);font-size:14px;min-height:42px}
+  .tab[aria-selected=true]{background:var(--panel2);color:var(--text);border-color:var(--accent-dim)}
+  main{padding:16px 0 40px}
+  .toolrow{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .toolrow input[type=text]{flex:1;min-width:140px}
+  .toolrow select{width:auto;min-width:150px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+  .card.dragging{box-shadow:0 14px 34px var(--shadow);border-color:var(--accent-dim);position:relative;z-index:5;opacity:.97}
+  .card .head{display:flex;align-items:center;gap:10px;padding:11px 14px}
+  .card .grip{
+    flex:none;width:30px;height:34px;border:0;background:transparent;color:var(--muted);
+    display:grid;place-items:center;cursor:grab;touch-action:none;border-radius:6px;
+  }
+  .card .grip:hover{color:var(--text);background:var(--panel2)}
+  .card .tap{flex:1;display:flex;align-items:center;gap:10px;min-width:0;background:none;border:0;text-align:left;padding:2px 0;color:inherit}
+  .card .ttl{flex:1;min-width:0;font-weight:600}
+  .card .ttl span{display:block;font-weight:400;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .when{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+  .card .body{padding:0 14px 14px;border-top:1px solid var(--line)}
+  .card .body textarea{min-height:150px;resize:vertical;line-height:1.6;margin-top:12px}
+  .card .body input[type=text]{margin-top:12px}
+  .cardact{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+
+  .drop{border:1.5px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;color:var(--muted);margin-bottom:14px;transition:border-color .15s,background .15s}
+  .drop.hot{border-color:var(--accent);background:var(--panel2);color:var(--text)}
+  .drop strong{display:block;color:var(--text);font-weight:600;margin-bottom:4px}
+  .frow{display:flex;align-items:center;gap:12px;padding:11px 12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px}
+  .fic{width:38px;height:38px;flex:none;display:grid;place-items:center;background:var(--panel2);border-radius:8px;font-size:11px;font-family:var(--mono);color:var(--accent);text-transform:uppercase;overflow:hidden}
+  .fic img{width:100%;height:100%;object-fit:cover}
+  .fmeta{flex:1;min-width:0}
+  .fmeta b{display:block;font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fmeta span{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .facts{display:flex;gap:6px;flex:none}
+  .iconbtn{background:transparent;border:1px solid var(--line);border-radius:8px;width:38px;height:38px;display:grid;place-items:center;color:var(--muted)}
+  .iconbtn:hover{color:var(--text);border-color:var(--accent-dim)}
+  .empty{text-align:center;color:var(--muted);padding:38px 12px;font-size:14.5px;border:1px dashed var(--line);border-radius:12px}
+  .empty b{display:block;color:var(--text);margin-bottom:5px;font-family:var(--display)}
+
+  .sheetwrap{position:fixed;inset:0;z-index:40;background:rgba(20,16,12,.6);display:flex;align-items:flex-end;justify-content:center}
+  .sheet{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:88dvh;overflow:auto}
+  .sheet h2{font-family:var(--display);font-size:19px;margin:0 0 4px}
+  .sheet p.sub{color:var(--muted);font-size:13.5px;margin:0 0 16px}
+  .check{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:12px}
+  .check input{margin:3px 0 0;accent-color:var(--accent);width:18px;height:18px;flex:none}
+  .check div{font-size:13.5px}
+  .check small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+  .previewbox{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:8px;margin-bottom:12px;text-align:center}
+  .previewbox img,.previewbox video{max-width:100%;max-height:56dvh;border-radius:6px;display:block;margin:0 auto}
+  .previewbox audio{width:100%}
+  .previewbox pre{text-align:left;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12.5px;max-height:52dvh;overflow:auto;margin:0}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));z-index:60;background:var(--panel);border:1px solid var(--accent-dim);color:var(--text);padding:11px 16px;border-radius:999px;font-size:14px;box-shadow:0 12px 30px var(--shadow);max-width:88vw;text-align:center}
+  .setcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:10px}
+  .setcard h2{font-family:var(--display);font-size:17px;margin:0 0 4px}
+  .setcard p{color:var(--muted);font-size:13.5px;margin:0 0 12px}
+  @media (min-width:700px){ .sheetwrap{align-items:center} .sheet{border-radius:14px;padding-bottom:20px} }
+  @media (prefers-reduced-motion:reduce){*{transition:none !important}}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<button class="themebtn" id="themeFixed" aria-label="Switch theme">☾</button>
+
+<!-- ============ LOCK SCREEN ============ -->
+<section id="gate">
+  <div class="plate" id="plate">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="14" y="20" width="36" height="34" rx="4" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/>
+      <g class="lid"><rect x="12" y="14" width="40" height="10" rx="3" fill="currentColor" opacity=".85"/></g>
+      <path d="M22 34h20M22 42h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+    </svg>
+    <h1>Noteblock</h1>
+    <p class="tagline" id="tagline">Notes and documents in one file</p>
+
+    <div id="mCreate" class="mode">
+      <div class="field">
+        <label class="fl" for="np">Password</label>
+        <input type="password" id="np" autocomplete="new-password" placeholder="At least 8 characters">
+        <div class="meter"><i id="meter"></i></div>
+      </div>
+      <div class="field">
+        <label class="fl" for="np2">Confirm password</label>
+        <input type="password" id="np2" autocomplete="new-password" placeholder="Type it again">
+      </div>
+      <button class="btn primary wide" id="btnCreate">Start</button>
+    </div>
+
+    <div id="mOpen" class="mode hidden">
+      <div class="field">
+        <label class="fl">File</label>
+        <button class="btn wide" id="pickFile" type="button" style="border-style:dashed;color:var(--muted)">Choose a .json file</button>
+        <input type="file" id="vaultFile" accept=".json,application/json" class="hidden">
+      </div>
+      <div class="field">
+        <label class="fl" for="op">Password</label>
+        <input type="password" id="op" autocomplete="current-password" placeholder="Password">
+      </div>
+      <button class="btn primary wide" id="btnOpen">Open</button>
+    </div>
+
+    <div id="mStored" class="mode hidden">
+      <div class="field">
+        <label class="fl" for="sp">Password</label>
+        <input type="password" id="sp" autocomplete="current-password" placeholder="Password">
+      </div>
+      <button class="btn primary wide" id="btnStored">Open</button>
+      <p class="note-sm">Saved on this browser. <button class="link" id="btnWipe" style="font-size:12.5px;padding:0">Remove it</button></p>
+    </div>
+
+    <p class="msg" id="gateMsg" role="status" aria-live="polite"></p>
+    <div class="rule"></div>
+    <div class="linkrow">
+      <button class="link" data-mode="create">New</button>
+      <button class="link" data-mode="open">Open a file</button>
+      <button class="link hidden" data-mode="stored" id="lnkStored">Saved here</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <header class="bar">
+    <div class="wrap">
+      <div class="barin">
+        <div class="brand">Noteblock</div>
+        <div class="spacer"></div>
+        <div class="stat" id="stat"></div>
+        <button class="themebtn" id="themeBar" aria-label="Switch theme">☾</button>
+        <button class="btn sm" id="btnExport">Save</button>
+        <button class="btn sm" id="btnLock">Close</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tabNotes" aria-selected="true">Notes</button>
+        <button class="tab" role="tab" id="tabFiles" aria-selected="false">Files</button>
+        <button class="tab" role="tab" id="tabSet" aria-selected="false" style="flex:0 0 auto;padding-inline:14px">Settings</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="panelNotes">
+      <div class="toolrow">
+        <input type="text" id="qNotes" placeholder="Search notes">
+        <select id="sortNotes" aria-label="Sort notes">
+          <option value="manual">My order</option>
+          <option value="new">Newest first</option>
+          <option value="old">Oldest first</option>
+          <option value="az">Title A–Z</option>
+        </select>
+        <button class="btn" id="btnNewNote">New note</button>
+      </div>
+      <div id="noteList"></div>
+    </section>
+
+    <section id="panelFiles" class="hidden">
+      <div class="drop" id="drop">
+        <strong>Drop files here</strong>
+        docx, xlsx, xlsm, jpg, png, mp3, mp4, pdf, zip — any type
+        <div style="margin-top:12px"><button class="btn" id="btnPickFiles">Choose files</button></div>
+        <input type="file" id="fileInput" multiple class="hidden">
+      </div>
+      <div class="toolrow">
+        <input type="text" id="qFiles" placeholder="Search files">
+        <select id="sortFiles" aria-label="Sort files">
+          <option value="new">Newest first</option>
+          <option value="old">Oldest first</option>
+          <option value="az">Name A–Z</option>
+          <option value="big">Largest first</option>
+        </select>
+      </div>
+      <div id="fileList"></div>
+    </section>
+
+    <section id="panelSet" class="hidden">
+      <div class="setcard">
+        <h2>Keep on this browser</h2>
+        <p>Reopen without picking a file each time. Still asks for the password.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="btnSaveLocal">Keep here</button>
+          <button class="btn danger" id="btnDropLocal">Remove</button>
+        </div>
+        <p class="note-sm" id="localNote"></p>
+      </div>
+
+      <div class="setcard">
+        <h2>Auto close</h2>
+        <p>Closes after a period without activity.</p>
+        <select id="autolock" style="max-width:220px">
+          <option value="0">Off</option>
+          <option value="60000">1 minute</option>
+          <option value="300000" selected>5 minutes</option>
+          <option value="900000">15 minutes</option>
+        </select>
+      </div>
+
+      <div class="setcard">
+        <h2>Change password</h2>
+        <div class="field"><input type="password" id="cp1" placeholder="New password" autocomplete="new-password"></div>
+        <div class="field"><input type="password" id="cp2" placeholder="Confirm new password" autocomplete="new-password"></div>
+        <button class="btn" id="btnChangePass">Update</button>
+        <p class="note-sm">Applies the next time you save. Files you already saved keep their old password.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const ENC = new TextEncoder(), DEC = new TextDecoder();
+  const ITER = 250000, STORE_KEY = "noteblock:data", THEME_KEY = "noteblock:theme";
+  const hasStore = !!(window.storage && window.storage.get);
+  const S = { data:null, pass:null, dirty:false, openNote:null, autolock:300000, timer:null, sort:"manual" };
+
+  /* ---------- helpers ---------- */
+  const b64 = buf => { const b = new Uint8Array(buf); let s = "";
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return btoa(s); };
+  const unb64 = str => { const bin = atob(str), a = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
+  const size = n => n < 1024 ? n + " B" : n < 1048576 ? (n/1024).toFixed(1) + " KB" :
+    n < 1073741824 ? (n/1048576).toFixed(1) + " MB" : (n/1073741824).toFixed(2) + " GB";
+  const when = t => new Date(t).toLocaleString(undefined, {day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"});
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  const esc = s => (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  let toastT;
+  function toast(msg){
+    let el = $(".toast");
+    if(!el){ el = document.createElement("div"); el.className = "toast"; document.body.appendChild(el); }
+    el.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => el.remove(), 2600);
+  }
+
+  /* ---------- theme ---------- */
+  function setTheme(t, save){
+    document.documentElement.dataset.theme = t;
+    const icon = t === "light" ? "☀" : "☾";
+    $("#themeFixed").textContent = icon; $("#themeBar").textContent = icon;
+    if (save && hasStore) window.storage.set(THEME_KEY, t, false).catch(() => {});
+  }
+  const toggleTheme = () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light", true);
+  $("#themeFixed").onclick = toggleTheme; $("#themeBar").onclick = toggleTheme;
+  (async () => {
+    let t = null;
+    if (hasStore){ try{ const r = await window.storage.get(THEME_KEY, false); t = r && r.value; }catch{} }
+    if (!t) t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    setTheme(t, false);
+  })();
+
+  /* ---------- crypto ---------- */
+  const canZip = typeof CompressionStream !== "undefined";
+  const gzip = async u8 => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+  const gunzip = async u8 => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+
+  async function keyFrom(pass, salt){
+    const base = await crypto.subtle.importKey("raw", ENC.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:ITER, hash:"SHA-256"},
+      base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+  }
+  async function seal(data, pass, compress){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await keyFrom(pass, salt);
+    let bytes = ENC.encode(JSON.stringify(data)), zip = null;
+    if (compress && canZip){ bytes = await gzip(bytes); zip = "gzip"; }
+    const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, bytes);
+    return { app:"noteblock", format:1, kdf:"PBKDF2-SHA256", iter:ITER, cipher:"AES-GCM-256",
+      zip, salt:b64(salt), iv:b64(iv), saved:new Date().toISOString(), payload:b64(ct) };
+  }
+  async function unseal(box, pass){
+    if (!box || !box.payload) throw new Error("format");
+    const key = await keyFrom(pass, unb64(box.salt));
+    let plain;
+    try{ plain = new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM", iv:unb64(box.iv)}, key, unb64(box.payload))); }
+    catch{ throw new Error("pass"); }
+    if (box.zip === "gzip") plain = await gunzip(plain);
+    return JSON.parse(DEC.decode(plain));
+  }
+
+  /* ---------- gate ---------- */
+  const gate = $("#gate"), app = $("#app"), gateMsg = $("#gateMsg");
+  const gmsg = (t, k) => { gateMsg.textContent = t || ""; gateMsg.className = "msg " + (k||""); };
+  function mode(m){
+    ["Create","Open","Stored"].forEach(x => $("#m"+x).classList.toggle("hidden", x.toLowerCase() !== m));
+    gmsg("");
+    $("#tagline").textContent = m === "create" ? "Notes and files in one file"
+      : m === "open" ? "Pick your file and enter the password" : "Welcome back";
+  }
+  $$("[data-mode]").forEach(b => b.onclick = () => mode(b.dataset.mode));
+
+  $("#np").oninput = e => {
+    const v = e.target.value; let s = Math.min(v.length / 14, 1) * 55;
+    if (/[a-z]/.test(v) && /[A-Z]/.test(v)) s += 15;
+    if (/\d/.test(v)) s += 12; if (/[^\w\s]/.test(v)) s += 18;
+    $("#meter").style.width = Math.min(s, 100) + "%";
+  };
+  $("#btnCreate").onclick = () => {
+    const a = $("#np").value, b = $("#np2").value;
+    if (a.length < 8) return gmsg("Use at least 8 characters.", "err");
+    if (a !== b) return gmsg("The two entries don't match.", "err");
+    S.pass = a; S.data = { v:1, notes:[], files:[], created:Date.now() }; unlock();
+  };
+
+  let picked = null;
+  $("#pickFile").onclick = () => $("#vaultFile").click();
+  $("#vaultFile").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try{
+      const j = JSON.parse(await f.text());
+      if (!j.payload) throw 0;
+      picked = j; $("#pickFile").textContent = f.name + " · " + size(f.size);
+      $("#pickFile").style.color = "var(--text)"; gmsg("Ready. Enter the password.", "ok"); $("#op").focus();
+    }catch{ picked = null; gmsg("That file can't be opened here.", "err"); }
+  };
+  $("#btnOpen").onclick = () => picked ? tryOpen(picked, $("#op").value) : gmsg("Choose a file first.", "err");
+  $("#btnStored").onclick = async () => {
+    const box = await loadLocal();
+    box ? tryOpen(box, $("#sp").value) : gmsg("Nothing saved on this browser.", "err");
+  };
+  async function tryOpen(box, pass){
+    if (!pass) return gmsg("Enter the password.", "err");
+    gmsg("Opening…");
+    try{ S.data = normalize(await unseal(box, pass)); S.pass = pass; unlock(); }
+    catch(err){ gmsg(err.message === "pass" ? "Wrong password." : "That file can't be read.", "err"); }
+  }
+  function normalize(d){
+    d.notes = d.notes || []; d.files = d.files || [];
+    d.notes.forEach((n, i) => { if (typeof n.order !== "number") n.order = i; });
+    return d;
+  }
+
+  function unlock(){
+    $("#plate").classList.add("open");
+    setTimeout(() => {
+      gate.classList.add("hidden"); app.classList.remove("hidden"); $("#themeFixed").classList.add("hidden");
+      $("#np").value = $("#np2").value = $("#op").value = $("#sp").value = "";
+      render(); resetTimer();
+    }, 380);
+  }
+  function lock(){
+    S.data = null; S.pass = null; S.dirty = false; S.openNote = null; picked = null;
+    $("#plate").classList.remove("open");
+    app.classList.add("hidden"); gate.classList.remove("hidden"); $("#themeFixed").classList.remove("hidden");
+    $("#pickFile").textContent = "Choose a .json file"; $("#pickFile").style.color = "var(--muted)";
+    refreshGate();
+  }
+  $("#btnLock").onclick = () => {
+    if (S.dirty && !confirm("You have unsaved changes. Close anyway?")) return;
+    lock();
+  };
+
+  /* ---------- local copy ---------- */
+  async function loadLocal(){
+    if (!hasStore) return null;
+    try{ const r = await window.storage.get(STORE_KEY, false); return r ? JSON.parse(r.value) : null; }catch{ return null; }
+  }
+  async function refreshGate(){
+    const box = await loadLocal();
+    $("#lnkStored").classList.toggle("hidden", !box);
+    mode(box ? "stored" : "create");
+  }
+
+  /* ---------- tabs ---------- */
+  const panels = { Notes:$("#panelNotes"), Files:$("#panelFiles"), Set:$("#panelSet") };
+  function tab(name){
+    for (const k in panels) panels[k].classList.toggle("hidden", k !== name);
+    $("#tabNotes").ariaSelected = name === "Notes";
+    $("#tabFiles").ariaSelected = name === "Files";
+    $("#tabSet").ariaSelected = name === "Set";
+  }
+  $("#tabNotes").onclick = () => tab("Notes");
+  $("#tabFiles").onclick = () => tab("Files");
+  $("#tabSet").onclick = () => tab("Set");
+
+  /* ---------- render ---------- */
+  function render(){ renderNotes(); renderFiles(); renderStat(); }
+  function renderStat(){
+    const bytes = S.data.files.reduce((a,f) => a + f.size, 0);
+    $("#stat").textContent = `${S.data.notes.length} · ${S.data.files.length} · ${size(bytes)}${S.dirty ? " •" : ""}`;
+    $("#stat").style.color = S.dirty ? "var(--accent)" : "var(--muted)";
+  }
+  const touch = () => { S.dirty = true; renderStat(); };
+
+  function sortedNotes(){
+    const q = $("#qNotes").value.trim().toLowerCase();
+    const list = S.data.notes.filter(n => !q || (n.title + " " + n.body).toLowerCase().includes(q));
+    const by = { manual:(a,b) => a.order - b.order, new:(a,b) => b.updated - a.updated,
+      old:(a,b) => a.updated - b.updated, az:(a,b) => (a.title||"").localeCompare(b.title||"") };
+    return list.sort(by[S.sort]);
+  }
+  function renderNotes(){
+    const list = sortedNotes(), box = $("#noteList"), manual = S.sort === "manual";
+    if (!list.length){
+      const q = $("#qNotes").value.trim();
+      box.innerHTML = `<div class="empty"><b>${q ? "No matches" : "No notes yet"}</b>${q ? "Try another word." : "Tap New note to start."}</div>`;
+      return;
+    }
+    box.innerHTML = list.map(n => {
+      const open = S.openNote === n.id;
+      const prev = (n.body || "").replace(/\s+/g," ").slice(0,90) || "Empty";
+      return `<article class="card" data-id="${n.id}">
+        <div class="head">
+          ${manual ? `<button class="grip" data-handle aria-label="Reorder note">⠿</button>` : ""}
+          <button class="tap" data-act="toggle">
+            <span class="ttl">${esc(n.title) || "Untitled"}<span>${esc(prev)}</span></span>
+            <span class="when">${when(n.updated)}</span>
+          </button>
+        </div>
+        ${open ? `<div class="body">
+          <input type="text" data-act="title" value="${esc(n.title)}" placeholder="Title">
+          <textarea data-act="body" placeholder="Write here">${esc(n.body)}</textarea>
+          <div class="cardact">
+            <button class="btn sm danger" data-act="del">Delete</button>
+            <button class="btn sm" data-act="close">Done</button>
+          </div></div>` : ""}
+      </article>`;
+    }).join("");
+    const ta = box.querySelector("textarea");
+    if (ta){ ta.style.height = "auto"; ta.style.height = Math.max(150, ta.scrollHeight) + "px"; }
+  }
+
+  $("#noteList").addEventListener("click", e => {
+    const btn = e.target.closest("[data-act]"); if (!btn) return;
+    const id = e.target.closest(".card").dataset.id, act = btn.dataset.act;
+    if (act === "toggle"){ S.openNote = S.openNote === id ? null : id; renderNotes(); }
+    else if (act === "close"){ S.openNote = null; renderNotes(); }
+    else if (act === "del"){
+      if (!confirm("Delete this note?")) return;
+      S.data.notes = S.data.notes.filter(n => n.id !== id);
+      S.openNote = null; touch(); renderNotes(); toast("Note deleted");
+    }
+  });
+  $("#noteList").addEventListener("input", e => {
+    const f = e.target.dataset.act; if (f !== "title" && f !== "body") return;
+    const n = S.data.notes.find(x => x.id === e.target.closest(".card").dataset.id); if (!n) return;
+    n[f] = e.target.value; n.updated = Date.now(); touch();
+    if (f === "body"){ e.target.style.height = "auto"; e.target.style.height = Math.max(150, e.target.scrollHeight) + "px"; }
+  });
+  $("#qNotes").oninput = renderNotes;
+  $("#sortNotes").onchange = e => { S.sort = e.target.value; renderNotes(); };
+  $("#btnNewNote").onclick = () => {
+    const min = S.data.notes.reduce((m,n) => Math.min(m, n.order), 0);
+    const n = { id:uid(), title:"", body:"", order:min - 1, created:Date.now(), updated:Date.now() };
+    S.data.notes.unshift(n); S.openNote = n.id; touch(); renderNotes();
+    setTimeout(() => $("#noteList input[data-act=title]")?.focus(), 30);
+  };
+
+  /* ---------- drag to reorder ---------- */
+  const noteList = $("#noteList");
+  let drag = null;
+  noteList.addEventListener("pointerdown", e => {
+    const h = e.target.closest("[data-handle]"); if (!h) return;
+    e.preventDefault();
+    const card = h.closest(".card");
+    drag = { card, startY:e.clientY, id:e.pointerId };
+    card.classList.add("dragging");
+    h.setPointerCapture(e.pointerId);
+    document.body.style.userSelect = "none";
+  });
+  noteList.addEventListener("pointermove", e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.startY;
+    drag.card.style.transform = `translateY(${dy}px)`;
+    const cards = [...noteList.children], i = cards.indexOf(drag.card);
+    const r = drag.card.getBoundingClientRect(), mid = r.top + r.height / 2;
+    const before = r.top;
+    const prev = cards[i-1], next = cards[i+1];
+    if (prev){
+      const p = prev.getBoundingClientRect();
+      if (mid < p.top + p.height/2) noteList.insertBefore(drag.card, prev);
+    }
+    if (next){
+      const nx = next.getBoundingClientRect();
+      if (mid > nx.top + nx.height/2) noteList.insertBefore(next, drag.card);
+    }
+    const after = drag.card.getBoundingClientRect().top;
+    if (after !== before) drag.startY += (after - before);
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    drag.card.classList.remove("dragging"); drag.card.style.transform = "";
+    document.body.style.userSelect = "";
+    [...noteList.children].forEach((el, i) => {
+      const n = S.data.notes.find(x => x.id === el.dataset.id); if (n) n.order = i;
+    });
+    drag = null; touch(); renderNotes();
+  };
+  noteList.addEventListener("pointerup", endDrag);
+  noteList.addEventListener("pointercancel", endDrag);
+  noteList.addEventListener("keydown", e => {
+    const h = e.target.closest("[data-handle]"); if (!h) return;
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const id = h.closest(".card").dataset.id;
+    const order = sortedNotes().map(n => n.id);
+    const i = order.indexOf(id), j = i + (e.key === "ArrowUp" ? -1 : 1);
+    if (j < 0 || j >= order.length) return;
+    order.splice(j, 0, order.splice(i, 1)[0]);
+    order.forEach((nid, k) => { const n = S.data.notes.find(x => x.id === nid); if (n) n.order = k; });
+    touch(); renderNotes();
+    setTimeout(() => noteList.querySelector(`.card[data-id="${id}"] [data-handle]`)?.focus(), 20);
+  });
+
+  /* ---------- files ---------- */
+  const PREV = { img:/^image\//, aud:/^audio\//, vid:/^video\//, txt:/^text\/|json|xml|csv|javascript/ };
+  function renderFiles(){
+    const q = $("#qFiles").value.trim().toLowerCase();
+    const by = { new:(a,b) => b.added - a.added, old:(a,b) => a.added - b.added,
+      az:(a,b) => a.name.localeCompare(b.name), big:(a,b) => b.size - a.size };
+    const list = S.data.files.filter(f => !q || f.name.toLowerCase().includes(q)).sort(by[$("#sortFiles").value]);
+    const box = $("#fileList");
+    if (!list.length){
+      box.innerHTML = `<div class="empty"><b>${q ? "No matches" : "No files yet"}</b>${q ? "Try another name." : "Drop anything above."}</div>`;
+      return;
+    }
+    box.innerHTML = list.map(f => {
+      const ext = (f.name.split(".").pop() || "?").slice(0,4);
+      const thumb = PREV.img.test(f.type) ? `<img src="data:${f.type};base64,${f.data}" alt="">` : esc(ext);
+      return `<div class="frow" data-id="${f.id}">
+        <div class="fic">${thumb}</div>
+        <div class="fmeta"><b>${esc(f.name)}</b><span>${size(f.size)} · ${when(f.added)}</span></div>
+        <div class="facts">
+          <button class="iconbtn" data-act="prev" aria-label="Preview">👁</button>
+          <button class="iconbtn" data-act="dl" aria-label="Download">⤓</button>
+          <button class="iconbtn" data-act="del" aria-label="Delete">✕</button>
+        </div></div>`;
+    }).join("");
+  }
+  $("#qFiles").oninput = renderFiles;
+  $("#sortFiles").onchange = renderFiles;
+
+  const fileBlob = f => new Blob([unb64(f.data)], { type: f.type || "application/octet-stream" });
+  function download(blob, name){
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  $("#fileList").addEventListener("click", e => {
+    const btn = e.target.closest("[data-act]"); if (!btn) return;
+    const f = S.data.files.find(x => x.id === e.target.closest(".frow").dataset.id); if (!f) return;
+    if (btn.dataset.act === "dl") download(fileBlob(f), f.name);
+    else if (btn.dataset.act === "del"){
+      if (!confirm(`Delete "${f.name}"?`)) return;
+      S.data.files = S.data.files.filter(x => x.id !== f.id); touch(); renderFiles(); toast("File deleted");
+    }
+    else preview(f);
+  });
+  function preview(f){
+    let inner;
+    if (PREV.img.test(f.type)) inner = `<img src="data:${f.type};base64,${f.data}" alt="${esc(f.name)}">`;
+    else if (PREV.aud.test(f.type)) inner = `<audio controls src="data:${f.type};base64,${f.data}"></audio>`;
+    else if (PREV.vid.test(f.type)) inner = `<video controls src="data:${f.type};base64,${f.data}"></video>`;
+    else if (PREV.txt.test(f.type) && f.size < 400000) inner = `<pre>${esc(DEC.decode(unb64(f.data)).slice(0, 20000))}</pre>`;
+    else inner = `<p style="color:var(--muted);font-size:13.5px;margin:14px 0">No preview for this type. Download it to open in another app.</p>`;
+    sheet(`<h2>${esc(f.name)}</h2><p class="sub">${size(f.size)} · ${esc(f.type || "unknown type")}</p>
+      <div class="previewbox">${inner}</div>
+      <div style="display:flex;gap:8px"><button class="btn primary" data-x="dl">Download</button><button class="btn" data-x="close">Close</button></div>`,
+      w => { $("[data-x=dl]", w).onclick = () => download(fileBlob(f), f.name); });
+  }
+
+  const MAXF = 200 * 1024 * 1024;
+  async function addFiles(files){
+    let added = 0;
+    for (const file of files){
+      if (file.size > MAXF){ toast(`${file.name} is too large (${size(file.size)})`); continue; }
+      S.data.files.push({ id:uid(), name:file.name, type:file.type || "", size:file.size,
+        added:Date.now(), data:b64(await file.arrayBuffer()) });
+      added++;
+    }
+    if (added){ touch(); renderFiles(); toast(added + (added > 1 ? " files added" : " file added")); }
+  }
+  $("#btnPickFiles").onclick = () => $("#fileInput").click();
+  $("#fileInput").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
+  const drop = $("#drop");
+  ["dragenter","dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("hot"); }));
+  ["dragleave","drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("hot"); }));
+  drop.addEventListener("drop", e => addFiles([...e.dataTransfer.files]));
+
+  /* ---------- sheet ---------- */
+  function sheet(html, after){
+    const wrap = document.createElement("div"); wrap.className = "sheetwrap";
+    wrap.innerHTML = `<div class="sheet">${html}</div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.addEventListener("click", e => { if (e.target === wrap || e.target.dataset.x === "close") close(); });
+    after && after(wrap, close);
+    return { wrap, close };
+  }
+
+  /* ---------- save ---------- */
+  $("#btnExport").onclick = () => {
+    const bytes = S.data.files.reduce((a,f) => a + f.size, 0);
+    const { wrap, close } = sheet(`
+      <h2>Save</h2>
+      <p class="sub">Everything goes into one .json file you can move or back up.</p>
+      <label class="check"><input type="checkbox" id="xzip" ${canZip ? "checked" : "disabled"}>
+        <div>Compress the file<small>${canZip ? "Smaller file, contents stay exactly the same." : "Not available in this browser."}</small></div></label>
+      <p class="sub" style="margin:0 0 14px">${S.data.notes.length} notes · ${S.data.files.length} files · ${size(bytes)}</p>
+      <div style="display:flex;gap:8px"><button class="btn primary" id="xgo">Download</button><button class="btn" data-x="close">Cancel</button></div>
+      <p class="msg" id="xmsg"></p>`);
+    $("#xgo", wrap).onclick = async () => {
+      const btn = $("#xgo", wrap); btn.disabled = true; btn.textContent = "Saving…";
+      try{
+        const text = JSON.stringify(await seal(S.data, S.pass, $("#xzip", wrap).checked));
+        const d = new Date(), p = n => String(n).padStart(2, "0");
+        download(new Blob([text], {type:"application/json"}),
+          `Noteblock_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}.json`);
+        S.dirty = false; renderStat();
+        $("#xmsg", wrap).className = "msg ok"; $("#xmsg", wrap).textContent = "Saved · " + size(text.length);
+        setTimeout(close, 1100);
+      }catch(e){
+        $("#xmsg", wrap).className = "msg err"; $("#xmsg", wrap).textContent = "Couldn't save: " + e.message;
+        btn.disabled = false; btn.textContent = "Download";
+      }
+    };
+  };
+
+  /* ---------- settings ---------- */
+  $("#localNote").textContent = hasStore ? "Tied to this browser. Use Save to move it elsewhere."
+    : "Not available here. Use Save to keep a file instead.";
+  if (!hasStore){ $("#btnSaveLocal").disabled = true; $("#btnDropLocal").disabled = true; }
+  $("#btnSaveLocal").onclick = async () => {
+    try{
+      const text = JSON.stringify(await seal(S.data, S.pass, true));
+      if (text.length > 4.6 * 1024 * 1024) return toast("Too large to keep here (" + size(text.length) + ")");
+      await window.storage.set(STORE_KEY, text, false);
+      S.dirty = false; renderStat(); toast("Kept on this browser");
+    }catch(e){ toast("Couldn't keep it: " + e.message); }
+  };
+  $("#btnDropLocal").onclick = async () => {
+    if (!confirm("Remove the copy kept on this browser?")) return;
+    try{ await window.storage.delete(STORE_KEY, false); toast("Removed"); }catch{ toast("Nothing to remove"); }
+  };
+  $("#btnWipe").onclick = async () => {
+    if (!confirm("Remove the copy kept on this browser?")) return;
+    try{ await window.storage.delete(STORE_KEY, false); }catch{}
+    refreshGate(); gmsg("Removed.", "ok");
+  };
+  $("#btnChangePass").onclick = () => {
+    const a = $("#cp1").value, b = $("#cp2").value;
+    if (a.length < 8) return toast("Use at least 8 characters");
+    if (a !== b) return toast("The two entries don't match");
+    S.pass = a; $("#cp1").value = $("#cp2").value = ""; touch(); toast("Password updated");
+  };
+  $("#autolock").onchange = e => { S.autolock = +e.target.value; resetTimer(); };
+
+  /* ---------- auto close ---------- */
+  function resetTimer(){
+    clearTimeout(S.timer);
+    if (S.autolock && S.data) S.timer = setTimeout(() => { if (S.data) lock(); }, S.autolock);
+  }
+  ["pointerdown","keydown","input","scroll"].forEach(t => document.addEventListener(t, resetTimer, {passive:true}));
+  window.addEventListener("beforeunload", e => { if (S.dirty){ e.preventDefault(); e.returnValue = ""; } });
+
+  refreshGate();
+  setTimeout(() => $("#np").focus(), 200);
+})();
+</script>
